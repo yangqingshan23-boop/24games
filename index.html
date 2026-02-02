@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24 Point Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            gap: 25px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2.2rem;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .num-container {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .num-card {
+            width: 80px;
+            height: 80px;
+            background: #3498db;
+            color: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            height: 55px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .new-game {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .calculate {
+            background: #f39c12;
+            color: white;
+        }
+
+        .hint {
+            background: #9b59b6;
+            color: white;
+        }
+
+        .division-switch {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .division-switch.active {
+            background: #27ae60;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .result-area {
+            width: 100%;
+            max-width: 500px;
+            min-height: 80px;
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 1.1rem;
+            color: #2c3e50;
+            line-height: 1.6;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 480px) {
+            .num-card {
+                width: 70px;
+                height: 70px;
+                font-size: 2.2rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            button {
+                min-width: 100px;
+                height: 50px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>24 Point Game</h1>
+    <div class="num-container" id="numContainer"></div>
+    <div class="btn-group">
+        <button class="new-game" id="newGame">New Game</button>
+        <button class="calculate" id="calculate">Calculate</button>
+        <button class="hint" id="hint">Hint</button>
+        <button class="division-switch" id="divisionSwitch">Division: OFF</button>
+    </div>
+    <div class="result-area" id="resultArea">Click New Game to start!</div>
+
+    <script>
+        // 全局变量
+        let currentNums = []; // 当前4个数字
+        let divisionEnabled = false; // 除法开关
+        const numContainer = document.getElementById('numContainer');
+        const resultArea = document.getElementById('resultArea');
+        const divisionSwitch = document.getElementById('divisionSwitch');
+        const newGameBtn = document.getElementById('newGame');
+        const calculateBtn = document.getElementById('calculate');
+        const hintBtn = document.getElementById('hint');
+
+        // 初始化
+        window.onload = () => {
+            initEventListeners();
+            generateSolvableNums(); // 初始生成必可解题目
+        };
+
+        // 事件监听
+        function initEventListeners() {
+            // 除法开关
+            divisionSwitch.addEventListener('click', () => {
+                divisionEnabled = !divisionEnabled;
+                divisionSwitch.classList.toggle('active');
+                divisionSwitch.textContent = `Division: ${divisionEnabled ? 'ON' : 'OFF'}`;
+                resultArea.textContent = `Division is now ${divisionEnabled ? 'enabled' : 'disabled'}`;
+            });
+
+            // 新游戏
+            newGameBtn.addEventListener('click', generateSolvableNums);
+
+            // 计算解法
+            calculateBtn.addEventListener('click', () => {
+                if (!currentNums.length) return;
+                const solutions = solve24(currentNums, divisionEnabled);
+                if (solutions.length) {
+                    resultArea.textContent = `Solutions:\n${solutions.join('\n')}`;
+                } else {
+                    resultArea.textContent = 'No solution found! (Switch on division and try again)';
+                }
+            });
+
+            // 提示
+            hintBtn.addEventListener('click', showHint);
+        }
+
+        // 生成1-10的4个数字，保证必可解（基于当前除法开关状态）
+        function generateSolvableNums() {
+            // 清空语音队列，避免重复播放
+            window.speechSynthesis.cancel();
+            resultArea.textContent = 'New numbers generated! Try to make 24!';
+            // 循环生成，直到找到有解的组合
+            while (true) {
+                currentNums = Array(4).fill(0).map(() => Math.floor(Math.random() * 10) + 1);
+                // 校验时传入当前除法开关状态，保证校验结果准确
+                if (solve24(currentNums, divisionEnabled).length > 0) {
+                    renderNums();
+                    break;
+                }
+            }
+        }
+
+        // 渲染数字卡片
+        function renderNums() {
+            numContainer.innerHTML = '';
+            currentNums.forEach(num => {
+                const card = document.createElement('div');
+                card.className = 'num-card';
+                card.textContent = num;
+                numContainer.appendChild(card);
+            });
+        }
+
+        // 文字+语音提示：凑数思路
+        function showHint() {
+            if (!currentNums.length) {
+                resultArea.textContent = 'Please start a new game first!';
+                return;
+            }
+            // 清空原有语音，避免叠加
+            window.speechSynthesis.cancel();
+            // 取最后一个数字作为移除的数字
+            const lastNum = currentNums[currentNums.length - 1];
+            const target1 = 24 - lastNum; // 加法凑数
+            const target2 = 24 + lastNum; // 减法凑数
+            const target3 = 24 * lastNum; // 除法凑数
+            const target4 = 24 / lastNum; // 乘法凑数
+            // 筛选整数目标值，更易理解
+            const validTargets = [target1, target2, target3]
+                .filter(t => Number.isInteger(t) && t > 0)
+                .concat(Number.isInteger(target4) ? target4 : []);
+            // 取前两个目标值作为提示
+            const [t1, t2] = validTargets.length >= 2 
+                ? [validTargets[0], validTargets[1]] 
+                : [validTargets[0] || 24 - lastNum, 24 + lastNum];
+            
+            // 提示文字
+            const hintText = `You can remove ${lastNum} first, and try to make ${t1} or ${t2} with the remaining numbers!`;
+            resultArea.textContent = hintText;
+
+            // 语音提示（浏览器原生语音合成）
+            try {
+                const utterance = new SpeechSynthesisUtterance(hintText);
+                utterance.lang = 'en-US';
+                utterance.volume = 1;
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.log('Speech synthesis not supported', e);
+            }
+        }
+
+        // 核心：24点求解 + 解法去重
+        function solve24(nums, allowDivision) {
+            const solutions = new Set(); // 用Set去重
+            const ops = allowDivision 
+                ? [['+', (a, b) => a + b], ['-', (a, b) => a - b], ['×', (a, b) => a * b], ['÷', (a, b) => b === 0 ? NaN : a / b]]
+                : [['+', (a, b) => a + b], ['-', (a, b) => a - b], ['×', (a, b) => a * b]];
+
+            // 生成数组的所有排列（处理数字顺序）
+            function permute(arr) {
+                if (arr.length === 1) return [arr];
+                const res = [];
+                for (let i = 0; i < arr.length; i++) {
+                    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+                    permute(rest).forEach(p => res.push([arr[i], ...p]));
+                }
+                return res;
+            }
+
+            // 递归计算所有组合
+            function calc(numsArr) {
+                if (numsArr.length === 1) {
+                    return [{ val: numsArr[0], expr: numsArr[0].toString() }];
+                }
+                const res = [];
+                // 拆分数字为左右两部分
+                for (let i = 1; i < numsArr.length; i++) {
+                    const leftNums = numsArr.slice(0, i);
+                    const rightNums = numsArr.slice(i);
+                    const leftResults = calc(leftNums);
+                    const rightResults = calc(rightNums);
+                    // 遍历所有运算符和左右结果
+                    for (const l of leftResults) {
+                        for (const r of rightResults) {
+                            for (const [op, fn] of ops) {
+                                const val = fn(l.val, r.val);
+                                // 过滤无效值（非数字、除法小数、负数，保证结果合理）
+                                if (isNaN(val) || !Number.isFinite(val) || (op === '÷' && val % 1 !== 0) || val < 0) continue;
+                                // 处理括号：根据运算符优先级添加，减少冗余括号
+                                let exprL = l.expr;
+                                let exprR = r.expr;
+                                // 左操作数是加减，当前是乘除，加括号
+                                if (/[+-]/.test(l.expr) && /[×÷]/.test(op)) exprL = `(${exprL})`;
+                                // 右操作数是加减，或当前是减/除，加括号
+                                if ((/[+-]/.test(r.expr) && /[×÷]/.test(op)) || /[-÷]/.test(op)) exprR = `(${exprR})`;
+                                const expr = `${exprL} ${op} ${exprR}`;
+                                res.push({ val, expr });
+                            }
+                        }
+                    }
+                }
+                return res;
+            }
+
+            // 遍历所有数字排列，计算并收集解
+            const allPerms = permute(nums);
+            allPerms.forEach(perm => {
+                const results = calc(perm);
+                results.forEach(r => {
+                    if (Math.abs(r.val - 24) < 1e-6) { // 浮点精度容错
+                        // 标准化表达式：去重核心（处理交换律、冗余括号）
+                        const normalized = normalizeExpr(r.expr);
+                        solutions.add(normalized);
+                    }
+                });
+            });
+
+            return Array.from(solutions);
+        }
+
+        // 表达式标准化：去重（交换律/冗余括号/加减顺序）
+        function normalizeExpr(expr) {
+            // 移除冗余括号（最外层括号、无优先级的括号）
+            function removeRedundantBrackets(s) {
+                while (s.startsWith('(') && s.endsWith(')')) {
+                    let balance = 0;
+                    let needRemove = true;
+                    for (let i = 0; i < s.length; i++) {
+                        if (s[i] === '(') balance++;
+                        if (s[i] === ')') balance--;
+                        if (balance === 0 && i < s.length - 1) {
+                            needRemove = false;
+                            break;
+                        }
+                    }
+                    if (needRemove) s = s.slice(1, -1);
+                    else break;
+                }
+                return s;
+            }
+
+            // 交换律标准化：a+b = b+a；a×b = b×a
+            function sortCommutative(s) {
+                const opReg = /([+×])/;
+                const parts = s.split(opReg);
+                if (parts.length === 3) {
+                    const [a, op, b] = parts;
+                    const aNorm = normalizeExpr(a);
+                    const bNorm = normalizeExpr(b);
+                    if (aNorm > bNorm) return `${bNorm} ${op} ${aNorm}`;
+                }
+                return s;
+            }
+
+            // 分步标准化
+            let normalized = removeRedundantBrackets(expr);
+            normalized = sortCommutative(normalized);
+            // 对嵌套表达式递归标准化
+            normalized = normalized.replace(/\(([^()]+)\)/g, (_, inner) => `(${normalizeExpr(inner)})`);
+            return normalized;
+        }
+    </script>
+</body>
+</html>
